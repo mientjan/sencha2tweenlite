@@ -1,10 +1,9 @@
-define( [ 'CSSReader', 'ANIMWriter', 'CSSWriter', 'TweenliteWriter' ], function( CSSReader, ANIMWriter, CSSWriter, TweenliteWriter ){
+define( [ 'ANIMWriter'], function(  ANIMWriter){
 
 	function Main(){
 
 		window.URL = window.URL || window.webkitURL;
 
-		var fileInput = $( 'input[type=file]' );
 		this.filecontents = ko.observableArray();
 		this.download = ko.observable( false );
 		this.downloadElement = $( '#download' )[0];
