@@ -2,14 +2,40 @@
 
 	function Property(name, value, parent){
 		this.name = name;
+		this.enabled = false;
+		
+		if( typeof(value) != 'undefined' ){
+			this.enabled = typeof(value.enabled) == 'undefined' ? true : value.enabled;
+		}
 		
 		switch( true ){
+			case /scene-endtime/.test(name) && this.enabled:
+				
+				this.enabled = false;
+				break;
+			case /custom-css/.test(name) && this.enabled:
+				value.value.split(';').forEach(function(css){
+					if(css == ""){
+						return;
+					}
+					css = css.split(':');
+					this.properties.push(new Property(css[0],css[1]));
+				}, parent);
+				this.enabled = false;
+				break;
+			case /object-text/.test(name):
+			case /scene-description/.test(name):
+			case /object-name/.test(name):
+			case /keyframe-time/.test(name):
+			case /keyframe-easing/.test(name):
+				this.enabled = false;
+				break;
 			case /-color/.test(name):
 				this.value = 'rgba('+[value.r,value.g,value.b,value.a].join(',')+')';
 				break;
 			case /object-image/.test(name):
 				parent.src = value.src;
-				return false;
+				this.enabled = false;
 				break;
 			case /background-image/.test(name):
 				this.value = 'url('+value.src+')';
@@ -19,21 +45,26 @@
 				parent.properties.push(new Property('x', value.x));
 				parent.properties.push(new Property('y', value.y));
 				parent.properties.push(new Property('z', value.z));
-				return false;
+				this.enabled = false;
 				break;
+			case /scale3d/.test(name):
+				parent.properties.push(new Property('scaleX', value.x));
+				parent.properties.push(new Property('scaleY', value.y));
+				parent.properties.push(new Property('scaleZ', value.z));
+				
+				this.enabled = false;
+				break;
+
 			case /border-/.test(name):
+				this.enabled = false;
 				this.value = value.width + 'px ' + value.line + ' rgba('+[value.r,value.g,value.b,value.a].join(',')+')';
-				break;
-			case /object-text/.test(name):
-			case /object-name/.test(name):
-			case /keyframe-easing/.test(name):
-				return false;
 				break;
 			case /rotate$/.test(name):
 				parent.properties.push(new Property('rotateX', value.x));
 				parent.properties.push(new Property('rotateY', value.y));
 				parent.properties.push(new Property('rotateZ', value.z));
-				return false;
+				
+				this.enabled = false;
 				break;
 
 			default:
@@ -42,17 +73,22 @@
 		}
 	}
 	
+	Property.prototype.name = '';
+	Property.prototype.value = '';
+	Property.prototype.enabled = true;
+	
 	function Keyframe(kf){
 		this.time = 0;
 		this.properties = [];
 		
-		Object.each(kf.properties, function(prop, name){
+		Object.each(kf.properties, function(value, name){
 			if(/keyframe-time/.test(name)){
-				this.time = prop.value;
+				this.time = value.value;
 			} else {
-				prop = new Property(name,prop, this);
-				if(prop){
-					this.properties.push(prop);
+				console.log(name, value);
+				value = new Property(name,value, this);
+				if(value.enabled){
+					this.properties.push(value);
 				}
 			}
 		}, this);
@@ -64,6 +100,7 @@
 		this.properties = [];
 		
 		keyframes.each(function(keyframe, index){
+			console.log('keyframe', index);
 			this.push(new Keyframe(keyframe) );
 		}, this.properties);
 	}
@@ -75,19 +112,18 @@
 		this.children = [];
 		this.keyframes = [];
 		
+		// console.log(this.type);
 		Object.each(el.properties, function(value, name){
-			
+
 			if( name == 'object-cssid'){
 				this.name = value.value;
 			} else {
 				value = new Property(name, value, this);
-				if(value){
+				if(value.enabled){
 					this.properties.push(value);
 				}
 			}
 		}, this );
-		
-		console.log(this.name);
 		
 		switch(this.type){
 			case 'image':
@@ -107,6 +143,19 @@
 		if(el.keyframes){
 			this.keyframes = new Keyframes(el.keyframes, this);
 			scope.animations.push(this.keyframes);
+			
+			// set first part of the key frame as property
+			Object.each(el.keyframes[0].properties, function(value, name){
+
+				if( name == 'object-cssid'){
+					this.name = value.value;
+				} else {
+					value = new Property(name, value, this);
+					if(value.enabled){
+						this.properties.push(value);
+					}
+				}
+			}, this );
 		}
 	}
 	
@@ -126,9 +175,13 @@
 		this.css = [];
 		this.elements = [];
 		
+		console.log(this.data);
+		
 		this.data.scenes.forEach(function(element){
 			this.elements.push( new Element(element, this) );
 		}, this);
+		
+//		console.log(this.rawData);
 	}
 	
 	function generateElementHtml(elements){
@@ -173,6 +226,7 @@
 				defaultProperties = [];
 		
 			el.properties.each(function(property){
+				
 				switch(property.name){
 					case 'object-name':
 					case 'object-text':
@@ -195,13 +249,16 @@
 					case 'rotateX':
 					case 'rotateY':
 					case 'rotateZ':
-						
-						transformProperties[property.name] = property.value + 'deg';
-						
-						break;
 					case 'rotate':
 					case 'scale':
 					case 'scale3d':
+					case 'scaleX':
+					case 'scaleY':
+					case 'scaleZ':
+						
+						transformProperties[property.name] = property.value;
+						break
+					case 'scaleX':
 						
 						transformProperties[property.name] = property.value;
 						break
@@ -247,11 +304,13 @@
 		
 		var el = null, 
 			response = "", 
+			offset = 0,
 			timeline = [],
 			element = [];
 	
 		// response += "$(document).ready(function(){";
 		response += "\n\tvar timeline = new TimelineLite();";
+		response += "\n\tvar offset = 0;";
 		
 		
 		for( var a = 0,l1=multipleKeyframes.length;a<l1;++a){
@@ -267,7 +326,7 @@
 					properties[property.name] = property.value;
 
 				}
-				timeline.push("timeline.add( TweenLite.to( $('#"+keyframes.el.name+"'), "+keyframe.time+", "+JSON.stringify(properties)+"), 0 );");
+				timeline.push("timeline.add( TweenLite.to( $('#"+keyframes.el.name+"'), "+keyframe.time+", "+JSON.stringify(properties)+"), offset );");
 			}
 		}
 			
