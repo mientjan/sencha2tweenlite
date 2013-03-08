@@ -7,28 +7,41 @@ and open the template in the editor.
 	<head>
 		<title></title>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-		
+
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
-		
+
 		<script src="js/lib/moo.basic.js"></script>
 		<script src="js/lib/knockout.js"></script>
 		<script data-main="js/main" src="js/lib/require.js"></script>
-		
+
 		<link href='http://fonts.googleapis.com/css?family=VT323' rel='stylesheet' type='text/css' />
-		<link href='bootstrap.css' rel='stylesheet' type='text/css' />
-		<link href='screen.css' rel='stylesheet' type='text/css' />
+		<link href='css/bootstrap.min.css' rel='stylesheet' type='text/css' />
+
 	</head>
 	<body>
-		<input type="file" data-bind="event: {change:fileChange}" />
-		
-		<fieldset>
-			<legend>asset base path</legend>
-			<input data-bind="value: assetBasePath" value="../image/" />
-		</fieldset>
-		
-		<fieldset>
-			<legend>result</legend>
-			<textarea data-bind="value: result" style="width: 100%; height:500px"></textarea>
-		</fieldset>
+		<form class="form-horizontal well-large">
+
+			<fieldset>
+				<legend>asset base path</legend>
+				<h3>html</h3>
+				<input data-bind="value: assetHtmlBasePath"  />
+				<h3>css</h3>
+				<input data-bind="value: assetCssBasePath" />
+			</fieldset>
+
+			<input type="file" data-bind="event: {change:fileChange}" />
+
+			<fieldset class="well" data-bind="with: result">
+				<legend>result</legend>
+				<h3>css:</h3>
+				<textarea data-bind="value: css" style="width: 100%;height: 200px;"></textarea>
+				<h3>js:</h3>
+				<textarea data-bind="value: js" style="width: 100%;height: 200px;"></textarea>
+				<h3>elements:</h3>
+				<textarea data-bind="value: html" style="width: 100%;height: 200px;"></textarea>
+
+			</fieldset>
+		</form>
+
 	</body>
 </html>

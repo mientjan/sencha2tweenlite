@@ -1,16 +1,17 @@
- define(function(){
+define(function(){
 
-	function Property(name, value, parent){
+	function Property(name, value, parent, basic){
+		basic = basic || false;
 		this.name = name;
 		this.enabled = false;
-		
-		if( typeof(value) != 'undefined' ){
+
+		if(typeof(value) != 'undefined'){
 			this.enabled = typeof(value.enabled) == 'undefined' ? true : value.enabled;
 		}
-		
-		switch( true ){
+
+		switch(true){
 			case /scene-endtime/.test(name) && this.enabled:
-				
+
 				this.enabled = false;
 				break;
 			case /custom-css/.test(name) && this.enabled:
@@ -19,7 +20,7 @@
 						return;
 					}
 					css = css.split(':');
-					this.properties.push(new Property(css[0],css[1]));
+					this.properties[css[0]] = new Property(css[0], css[1]);
 				}, parent);
 				this.enabled = false;
 				break;
@@ -31,39 +32,48 @@
 				this.enabled = false;
 				break;
 			case /-color/.test(name):
-				this.value = 'rgba('+[value.r,value.g,value.b,value.a].join(',')+')';
+				this.value = 'rgba(' + [value.r, value.g, value.b, value.a].join(',') + ')';
 				break;
 			case /object-image/.test(name):
 				parent.src = value.src;
 				this.enabled = false;
 				break;
 			case /background-image/.test(name):
-				this.value = 'url('+value.src+')';
-				
+				this.value = 'url(' + value.src + ')';
+
 				break;
 			case /translate3d/.test(name):
-				parent.properties.push(new Property('x', value.x));
-				parent.properties.push(new Property('y', value.y));
-				parent.properties.push(new Property('z', value.z));
+				// parent.properties[name] = {};
+				parent.properties['position'] = new Property('position', 'absolute');
+				if(!basic){
+					parent.properties['x'] = new Property('x', value.x);
+					parent.properties['y'] = new Property('y', value.y);
+					parent.properties['z'] = new Property('z', value.z);
+				} else {
+					parent.properties['left'] = new Property('left', value.x);
+					parent.properties['top'] = new Property('top', value.y);
+				}
 				this.enabled = false;
 				break;
 			case /scale3d/.test(name):
-				parent.properties.push(new Property('scaleX', value.x));
-				parent.properties.push(new Property('scaleY', value.y));
-				parent.properties.push(new Property('scaleZ', value.z));
-				
-				this.enabled = false;
-				break;
+					// parent.properties[name] = {};
+					parent.properties['scaleX'] = new Property('scaleX', value.x);
+					parent.properties['scaleY'] = new Property('scaleY', value.y);
+					parent.properties['scaleZ'] = new Property('scaleZ', value.z);
 
-			case /border-/.test(name):
-				this.enabled = false;
-				this.value = value.width + 'px ' + value.line + ' rgba('+[value.r,value.g,value.b,value.a].join(',')+')';
+					this.enabled = false;
+					break;
+
+				case /border-/.test(name):
+						this.enabled = false;
+				this.value = value.width + 'px ' + value.line + ' rgba(' + [value.r, value.g, value.b, value.a].join(',') + ')';
 				break;
 			case /rotate$/.test(name):
-				parent.properties.push(new Property('rotateX', value.x));
-				parent.properties.push(new Property('rotateY', value.y));
-				parent.properties.push(new Property('rotateZ', value.z));
-				
+				// parent.properties[name] = {};
+				parent.properties['rotateX'] = new Property('rotateX', value.x);
+				parent.properties['rotateY'] = new Property('rotateY', value.y);
+				parent.properties['rotateZ'] = new Property('rotateZ', value.z);
+
 				this.enabled = false;
 				break;
 
@@ -72,59 +82,83 @@
 				break;
 		}
 	}
-	
+
 	Property.prototype.name = '';
 	Property.prototype.value = '';
 	Property.prototype.enabled = true;
-	
+
 	function Keyframe(kf){
 		this.time = 0;
-		this.properties = [];
-		
-		Object.each(kf.properties, function(value, name){
-			if(/keyframe-time/.test(name)){
-				this.time = value.value;
-			} else {
-				console.log(name, value);
-				value = new Property(name,value, this);
-				if(value.enabled){
-					this.properties.push(value);
-				}
-			}
-		}, this);
-	}
-	
-	function Keyframes(keyframes, el)
-	{
-		this.el = el;
-		this.properties = [];
-		
-		keyframes.each(function(keyframe, index){
-			console.log('keyframe', index);
-			this.push(new Keyframe(keyframe) );
-		}, this.properties);
-	}
-	
-	function Element(el, scope){
-		
-		this.type = el.type || '';
-		this.properties = [];
-		this.children = [];
-		this.keyframes = [];
-		
-		// console.log(this.type);
-		Object.each(el.properties, function(value, name){
+		this.properties = {};
+		this.easing = '';
 
-			if( name == 'object-cssid'){
-				this.name = value.value;
+		Object.each(kf.properties, function(value, name){
+			if(/keyframe-easing/.test(name)){
+				this.easing = Keyframe.EASINGTYPE[value.type];
+			} else if(/keyframe-time/.test(name)){
+				this.time = value.value;
 			} else {
 				value = new Property(name, value, this);
 				if(value.enabled){
-					this.properties.push(value);
+					this.properties[value.name] = value;
 				}
 			}
-		}, this );
-		
+		}, this);
+
+		if(this.properties['position']){
+			delete this.properties['position'];
+		}
+	}
+
+	Keyframe.EASINGTYPE = [
+		null,
+		null,
+		'Power2.linear',
+		'Power2.easeIn',
+		'Power2.easeOut',
+		'Power2.easeInOut'
+	];
+
+	function Keyframes(keyframes, el)
+	{
+		this.el = el;
+		this.data = [];
+
+		keyframes.each(function(keyframe, index){
+			this.push(new Keyframe(keyframe));
+		}, this.data);
+	}
+
+	function Element(el, scope){
+
+		this.type = el.type || '';
+		this.properties = {};
+		this.children = [];
+		this.keyframes = [];
+
+		// console.log(this.type);
+		if(el.properties){
+			Object.each(el.properties, function(value, name){
+
+				if(name == 'object-cssid'){
+					this.name = value.value;
+				} else {
+
+					// name = name.replace(/x/, 'left');
+					// name = name.replace(/y/, 'top');
+
+					value = new Property(name, value, this, true);
+					if(value.enabled){
+						this.properties[value.name] = value;
+					}
+				}
+			}, this);
+		}
+
+		if(this.name == ''){
+			console.warn('you forgot a name', this);
+		}
+
 		switch(this.type){
 			case 'image':
 			case 'text':
@@ -134,99 +168,111 @@
 				data = el.data.children;
 				break;
 		}
-		
+
 		data.each(function(element){
-			this.children.push( new Element(element, scope) )
+			this.children.push(new Element(element, scope))
 		}, this);
-		
+
 		// keyframes
 		if(el.keyframes){
-			this.keyframes = new Keyframes(el.keyframes, this);
-			scope.animations.push(this.keyframes);
-			
-			// set first part of the key frame as property
-			Object.each(el.keyframes[0].properties, function(value, name){
 
-				if( name == 'object-cssid'){
-					this.name = value.value;
-				} else {
+			if(el.keyframes.length > 1){
+				this.keyframes = new Keyframes(el.keyframes, this);
+				scope.animations.push(this.keyframes);
+			}
+
+//			// set first part of the key frame as property
+			if(el.keyframes[0]
+					&& el.keyframes[0].properties
+					&& el.keyframes[0].properties['keyframe-time']
+					&& el.keyframes[0].properties['keyframe-time'].value == 0
+					&& el.keyframes[0].properties['keyframe-time'].enabled
+					){
+
+				Object.each(el.keyframes[0].properties, function(value, name){
+
 					value = new Property(name, value, this);
 					if(value.enabled){
-						this.properties.push(value);
+						this.properties[value.name] = value;
 					}
-				}
-			}, this );
+
+				}, this);
+			}
+//			// console.log(this.name, this.properties);
 		}
 	}
-	
+
 	Element.prototype.name = '';
 	Element.prototype.type = '';
 	Element.prototype.children = null;
 	Element.prototype.properties = null;
 	Element.prototype.keyframes = null;
 
-	function ANIMWriter( rawData ){
-		
+	function ANIMWriter(rawData){
+
 		this.rawData = rawData;
 		this.data = JSON.decode(rawData);
-		
+
 		this.all = [];
 		this.animations = [];
 		this.css = [];
 		this.elements = [];
-		
-		console.log(this.data);
-		
+
 		this.data.scenes.forEach(function(element){
-			this.elements.push( new Element(element, this) );
+			this.elements.push(new Element(element, this));
 		}, this);
-		
-//		console.log(this.rawData);
+
 	}
-	
+
+	ANIMWriter.prototype.useBasic = false;
+
 	function generateElementHtml(elements){
 		var el = null, response = '', data = [];
-		for( var i = 0,l=elements.length;i<l;++i){
+		for(var i = 0, l = elements.length; i < l; ++i){
 			el = elements[i];
 			response = '';
-			
 
-			if(el.children.length>0){
+
+			if(el.children.length > 0){
 				response = generateElementHtml(el.children);
 			}
-			
-			
-			switch( el.type ){
-				case 'image':{
-					
-					data.push('<img id="'+el.name+'" src="'+el.src+'" />')
-					break;
-				}
-				default:{
-					data.push('<div id="'+el.name+'">'+response+'</div>')
-					break;
-				}
+
+
+			switch(el.type){
+				case 'image':
+					{
+
+						data.push('<img id="' + el.name + '" src="' + el.src + '" />')
+						break;
+					}
+				default:
+					{
+						data.push('<div id="' + el.name + '">' + response + '</div>')
+						break;
+					}
 			}
-			
+
 		}
-		
+
 		return data.join("\n");
 	}
-	
+
 	function generateStyleSheet(elements){
 		var el = null, data = [];
-		for( var i = 0,l=elements.length;i<l;++i){
+		for(var i = 0, l = elements.length; i < l; ++i){
 			el = elements[i];
 
-			if(el.children.length>0){
-				data.push( generateStyleSheet(el.children) );
+			if(el.children.length > 0){
+				data.push(generateStyleSheet(el.children));
 			}
-			
+
 			var transformProperties = {},
-				defaultProperties = [];
-		
-			el.properties.each(function(property){
-				
+					defaultProperties = [];
+
+
+			// console.log(el.name, el.properties);
+			Object.each(el.properties, function(property, name){
+				// console.log(property.name, property.value);
 				switch(property.name){
 					case 'object-name':
 					case 'object-text':
@@ -242,142 +288,256 @@
 						if(!transformProperties['translate3d']){
 							transformProperties['translate3d'] = {};
 						}
-						
+
+//						if(/[xy]/.test(property.name)){
+//							property.name = property.name.replace(/x/, 'left');
+//							property.name = property.name.replace(/y/, 'top');
+//							
+//							defaultProperties.push(property.name+': ' + property.value+'px');
+//						}
+
 						transformProperties['translate3d'][property.name] = property.value;
-						
+
 						break;
 					case 'rotateX':
 					case 'rotateY':
 					case 'rotateZ':
 					case 'rotate':
+						transformProperties[property.name] = property.value + 'deg';
+						break
 					case 'scale':
 					case 'scale3d':
 					case 'scaleX':
 					case 'scaleY':
 					case 'scaleZ':
-						
+						property.name = property.name.replace(/rotateZ/, 'rotate');
+						property.name = property.name.replace(/scaleZ/, 'scale');
 						transformProperties[property.name] = property.value;
 						break
-					case 'scaleX':
-						
-						transformProperties[property.name] = property.value;
+					case 'left':
+					case 'top':
+						if(!transformProperties['translate3d']){
+							transformProperties['translate3d'] = {'x': 0, 'y': 0, 'z': 0};
+						}
+						defaultProperties.push(property.name + ': ' + property.value + 'px');
 						break
 					case 'height':
 					case 'width':
-						defaultProperties.push(property.name+': ' + property.value + 'px');
+						defaultProperties.push(property.name + ': ' + property.value + 'px');
 						break
 					default:
-						defaultProperties.push(property.name+': ' + property.value);
+						defaultProperties.push(property.name + ': ' + property.value);
 						break
-					
+
 				}
 			})
-			
-			if(Object.getLength(transformProperties)>0){
-				var transform = [];
+
+			if( Object.getLength(transformProperties) > 0)
+			{
+				var transformAll = [],
+					transformIE9 = [];
+				
 				Object.each(transformProperties, function(value, name){
 					switch(name){
 						case 'translate3d':
-							transform.push(name+'('+[value.x,value.y,value.z].join('px,')+'px)');
+							transformAll.push(name + '(' + [value.x, value.y, value.z].join('px,') + 'px)');
+							transformIE9.push('translate(' + [value.x, value.y].join('px,') + 'px)');
 							break;
 						default:
-							transform.push(name+'('+value+')');
+							transformAll.push(name + '(' + value + ')');
+							transformIE9.push(name + '(' + value + ')');
 							break;
 					}
 				});
-				
-				defaultProperties.push('-webkit-transform: '+transform.join(' '));
-				defaultProperties.push('-ms-transform: '+transform.join(' '));
-				defaultProperties.push('-moz-transform: '+transform.join(' '));
-				defaultProperties.push('transform: '+transform.join(' '));
+
+				defaultProperties.push('-webkit-transform: ' + transformAll.join(' '));
+				defaultProperties.push('-ms-transform: ' + transformAll.join(' '));
+				defaultProperties.push('-ms-transform: ' + transformIE9.join(' '));
+				defaultProperties.push('-moz-transform: ' + transformAll.join(' '));
+				defaultProperties.push('transform: ' + transformAll.join(' '));
 			}
-			
-			data.push( '#'+el.name+" {\n\t"+defaultProperties.join(";\n\t") + "\n}\n");
-			
+
+			data.push('#' + el.name + " {\n\t" + defaultProperties.join(";\n\t") + "\n}\n");
+
 		}
-		
+
 		return data.join("\n");
 	}
-	
-		
-	function generateJs(multipleKeyframes){
-		
-		var el = null, 
-			response = "", 
-			offset = 0,
-			timeline = [],
-			element = [];
-	
+
+
+	function generateJs(multipleKeyframes, useBasic){
+
+		var el = null,
+				response = "",
+				offset = 0,
+				timeline = [],
+				element = [];
+
 		// response += "$(document).ready(function(){";
 		response += "\n\tvar timeline = new TimelineLite();";
 		response += "\n\tvar offset = 0;";
-		
-		
-		for( var a = 0,l1=multipleKeyframes.length;a<l1;++a){
-			keyframes = multipleKeyframes[a];
-			
-			for( var b = 0,l2=keyframes.properties.length;b<l2;++b){
-				keyframe = keyframes.properties[b];
-				
-				var properties = {}
-				for( var c = 0,l3=keyframe.properties.length;c<l3;++c){
-					property = keyframe.properties[c];
-					
-					properties[property.name] = property.value;
 
+		// console.log(multipleKeyframes);
+		for(var a = 0, l1 = multipleKeyframes.length; a < l1; ++a){
+			keyframes = multipleKeyframes[a];
+
+			var totalTime = 0,
+					prevTime = 0;
+			;
+
+			if(keyframes.data.length > 0)
+			{
+				for(var b = 0, l2 = keyframes.data.length; b < l2; ++b)
+				{
+					keyframe = keyframes.data[b];
+
+					var properties = {},
+							name;
+
+					Object.each(keyframe.properties, function(property, name){
+						if(/rotate/.test(name)){
+							name = name.replace(/rotate/, 'rotation');
+						}
+
+						if(useBasic){
+							if(/[xy]/.test(name)){
+								name = name.replace(/x/, 'left');
+								name = name.replace(/y/, 'top');
+							}
+						}
+
+						this[name] = property.value;
+					}, properties);
+
+
+					if(keyframe.easing != ''){
+						properties['ease'] = keyframe.easing;
+					}
+
+					properties = JSON.stringify(properties);
+					properties = properties.replace(new RegExp('"ease":"' + keyframe.easing + '"'), 'ease:' + keyframe.easing + '');
+
+					timeline.push("timeline.to( $('#" + keyframes.el.name + "'), " + (keyframe.time - prevTime) + ", " + properties + ", (offset + " + prevTime + ") );");
+
+					prevTime = keyframe.time;
 				}
-				timeline.push("timeline.add( TweenLite.to( $('#"+keyframes.el.name+"'), "+keyframe.time+", "+JSON.stringify(properties)+"), offset );");
 			}
 		}
-			
-			// console.log(keyframe);
-//			response = '';
-//			
-//
-//			if(el.children.length>0){
-//				response = generateElementHtml(el.children);
-//			}
-//			
-//			
-//			switch( el.type ){
-//				case 'image':{
-//					
-//					data.push('<img id="'+el.name+'" src="'+el.src+'" />')
-//					break;
-//				}
-//				default:{
-//					data.push('<div id="'+el.name+'">'+response+'</div>')
-//					break;
-//				}
-//			}
-			
-		
+
+
 		response += "\n\t" + timeline.join("\n\t");
 		response += "\n\t timeline.pause();";
 		// response += "\n });";
-		
+
 		return response;
 	}
+
+	function generateJsFromTo(multipleKeyframes, useBasic){
+
+		var el = null,
+				response = "",
+				offset = 0,
+				timeline = [],
+				element = [],
+				keyframeA = null,
+				keyframeB = null;
+
+
+
+		// response += "$(document).ready(function(){";
+		response += "\n\tvar timeline = new TimelineLite();";
+		response += "\n\tvar offset = 0;";
+
+		for(var a = 0, l1 = multipleKeyframes.length; a < l1; ++a){
+			keyframes = multipleKeyframes[a];
+
+			var totalTime = 0,
+				prevTime = 0,
+				offsetTime = 0;
+
+			if(keyframes.data.length > 0)
+			{
+				for(var b = 0, l2 = keyframes.data.length; b < l2; ++b)
+				{
+					keyframeA = keyframes.data[b];
+					keyframeB = keyframes.data[b + 1];
+
+					if(typeof(keyframeB) == 'undefined'){
+						break;
+					}
+					
+					if(b == 0){
+						offsetTime = 0.001;
+						var data = 'timeline.to('
+								+ "$('#" + keyframes.el.name + "'), "
+								+ offsetTime + ", "
+								+ generateJsFromTo.formatProperties(keyframeA, useBasic) + ', '
+								+ "(offset)"
+								+ ');';
 	
-	ANIMWriter.prototype.parse = function(){
-		
-		var cssElements = generateStyleSheet(this.elements);
-		var htmlElements = generateElementHtml(this.elements);
-		var jsElements = generateJs(this.animations);
-		
-		var response = "";
-		
-		response += "<style>"+cssElements+"</style>\n\n";
-		response += "<script>\n";
-		response += "$(document).ready(function(){\n\t"+jsElements+"\n});\n";
-		response += "</script>\n";
-		"</script>\n\n";
-		response += htmlElements;
-		
-		
-		return response; // + cssElements + htmlElements;
+						timeline.push(data);
+					}
+					
+					var data = 'timeline.to('
+							+ "$('#" + keyframes.el.name + "'), "
+							+ (keyframeB.time - keyframeA.time) + ", "
+							// + generateJsFromTo.formatProperties(keyframeA, useBasic) + ', '
+							+ generateJsFromTo.formatProperties(keyframeB, useBasic) + ', '
+							+ "(offset + " + (prevTime + offsetTime) + ")"
+							+ ');';
+//
+					timeline.push(data);
+
+					prevTime += (keyframeB.time - keyframeA.time);
+
+				}
+			}
+		}
+
+		response += "\n\t" + timeline.join("\n\t");
+		response += "\n\t timeline.pause();";
+
+		return response;
 	}
-	
-	
+
+	generateJsFromTo.formatProperties = function(keyframe, useBasic){
+		var properties = {};
+		Object.each(keyframe.properties, function(property, name){
+			if(/rotate/.test(name)){
+				name = name.replace(/rotate/, 'rotation');
+			}
+
+			if(useBasic){
+				if(/[xy]/.test(name)){
+					name = name.replace(/x/, 'left');
+					name = name.replace(/y/, 'top');
+				}
+			}
+
+			this[name] = property.value;
+		}, properties);
+
+		if(keyframe.easing != ''){
+			properties['ease'] = keyframe.easing;
+		}
+
+		// easing
+		properties = JSON.stringify(properties);
+		return properties.replace(new RegExp('"ease":"' + keyframe.easing + '"'), 'ease:' + keyframe.easing + '');
+	}
+
+
+	ANIMWriter.prototype.parse = function(){
+
+		var result = {};
+
+		result.css = generateStyleSheet(this.elements);
+		result.html = generateElementHtml(this.elements);
+		result.js = generateJsFromTo(this.animations, this.useBasic);
+
+		return result;
+	}
+
+
 	return ANIMWriter;
-} );
+});

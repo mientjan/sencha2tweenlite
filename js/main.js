@@ -5,10 +5,15 @@ define( [ 'ANIMWriter'], function(  ANIMWriter){
 		window.URL = window.URL || window.webkitURL;
 
 		this.filecontents = ko.observableArray();
-		this.download = ko.observable( false );
-		this.downloadElement = $( '#download' )[0];
-		this.assetBasePath = ko.observable('../image/');
-		this.result = ko.observable();
+
+		this.assetCssBasePath = ko.observable('../image/experience/scene1/');
+		this.assetHtmlBasePath = ko.observable('inc/image/experience/scene1/');
+		
+		this.result = {};
+		this.result.css = ko.observable();
+		this.result.js = ko.observable();
+		this.result.html = ko.observable();
+		
 	}
 
 	Main.prototype.getGreensockLibrary = function( fn ){
@@ -38,8 +43,14 @@ define( [ 'ANIMWriter'], function(  ANIMWriter){
 				reader.onload = function( e ){
 					
 					var writer = new ANIMWriter( e.target.result );
-
-					this.result( writer.parse().replace(/asset:\/\//g,this.assetBasePath()) );
+					var result = writer.parse();
+					
+					// console.log(result.html.replace(/asset:\/\//g,this.assetHtmlBasePath()));
+					
+					console.log( result.css );
+					this.result.css( result.css.replace(/asset:\/\//g,this.assetCssBasePath()) );
+					this.result.html( result.html.replace(/asset:\/\//g,this.assetHtmlBasePath()) );
+					this.result.js(result.js);
 				}.bind(this);
 				
 				reader.readAsText( file );
