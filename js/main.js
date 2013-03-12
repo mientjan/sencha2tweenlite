@@ -47,7 +47,6 @@ define( [ 'ANIMWriter'], function(  ANIMWriter){
 					
 					// console.log(result.html.replace(/asset:\/\//g,this.assetHtmlBasePath()));
 					
-					console.log( result.css );
 					this.result.css( result.css.replace(/asset:\/\//g,this.assetCssBasePath()) );
 					this.result.html( result.html.replace(/asset:\/\//g,this.assetHtmlBasePath()) );
 					this.result.js(result.js);

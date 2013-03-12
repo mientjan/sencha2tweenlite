@@ -20,6 +20,7 @@ define(function(){
 						return;
 					}
 					css = css.split(':');
+					
 					this.properties[css[0]] = new Property(css[0], css[1]);
 				}, parent);
 				this.enabled = false;
@@ -257,22 +258,27 @@ define(function(){
 		return data.join("\n");
 	}
 
-	function generateStyleSheet(elements){
+	function generateStyleSheet(elements, formatForOldBrowsers, firstNode )
+	{
 		var el = null, data = [];
 		for(var i = 0, l = elements.length; i < l; ++i){
 			el = elements[i];
 
 			if(el.children.length > 0){
-				data.push(generateStyleSheet(el.children));
+				data.push(generateStyleSheet(el.children, formatForOldBrowsers));
 			}
 
 			var transformProperties = {},
-					defaultProperties = [];
+					properties = {};
 
 
 			// console.log(el.name, el.properties);
 			Object.each(el.properties, function(property, name){
-				// console.log(property.name, property.value);
+
+				if( firstNode && (/background-color/.test(name) || /border-color/.test(name)) ){
+					return;
+				}
+
 				switch(property.name){
 					case 'object-name':
 					case 'object-text':
@@ -285,19 +291,17 @@ define(function(){
 					case 'x':
 					case 'y':
 					case 'z':
-						if(!transformProperties['translate3d']){
-							transformProperties['translate3d'] = {};
+						if(!formatForOldBrowsers){
+							if(!transformProperties['translate3d']){
+								transformProperties['translate3d'] = {};
+							}
+
+							transformProperties['translate3d'][property.name] = property.value;
+						} else if(/^[xy]$/.test(property.name)){
+							properties[
+									property.name.replace(/[x]/, 'left').replace(/[y]/, 'top')
+							] = property.value + 'px';
 						}
-
-//						if(/[xy]/.test(property.name)){
-//							property.name = property.name.replace(/x/, 'left');
-//							property.name = property.name.replace(/y/, 'top');
-//							
-//							defaultProperties.push(property.name+': ' + property.value+'px');
-//						}
-
-						transformProperties['translate3d'][property.name] = property.value;
-
 						break;
 					case 'rotateX':
 					case 'rotateY':
@@ -319,24 +323,30 @@ define(function(){
 						if(!transformProperties['translate3d']){
 							transformProperties['translate3d'] = {'x': 0, 'y': 0, 'z': 0};
 						}
-						defaultProperties.push(property.name + ': ' + property.value + 'px');
+
+						properties[property.name] = property.value + 'px';
 						break
 					case 'height':
 					case 'width':
-						defaultProperties.push(property.name + ': ' + property.value + 'px');
+						properties[property.name] = property.value + 'px';
 						break
 					default:
-						defaultProperties.push(property.name + ': ' + property.value);
+						properties[property.name] = property.value;
 						break
 
 				}
-			})
+			});
 
-			if( Object.getLength(transformProperties) > 0)
+			var stylesheet = [];
+			Object.each(properties, function(value, name){
+				stylesheet.push([name, value].join(':'));
+			});
+
+			if(!formatForOldBrowsers && Object.getLength(transformProperties) > 0)
 			{
 				var transformAll = [],
-					transformIE9 = [];
-				
+						transformIE9 = [];
+
 				Object.each(transformProperties, function(value, name){
 					switch(name){
 						case 'translate3d':
@@ -350,110 +360,46 @@ define(function(){
 					}
 				});
 
-				defaultProperties.push('-webkit-transform: ' + transformAll.join(' '));
-				defaultProperties.push('-ms-transform: ' + transformAll.join(' '));
-				defaultProperties.push('-ms-transform: ' + transformIE9.join(' '));
-				defaultProperties.push('-moz-transform: ' + transformAll.join(' '));
-				defaultProperties.push('transform: ' + transformAll.join(' '));
+				stylesheet.push('-webkit-transform: ' + transformAll.join(' '));
+				stylesheet.push('-ms-transform: ' + transformAll.join(' '));
+				stylesheet.push('-ms-transform: ' + transformIE9.join(' '));
+				stylesheet.push('-moz-transform: ' + transformAll.join(' '));
+				stylesheet.push('transform: ' + transformAll.join(' '));
+			}
+			// console.log(formatForOldBrowsers);
+			if(!formatForOldBrowsers){
+				data.push('#' + el.name + " {\n\t" + stylesheet.join(";\n\t") + "\n}\n");
+			} else {
+				data.push('.oldie #' + el.name + " {\n\t" + stylesheet.join(";\n\t") + "\n}\n");
 			}
 
-			data.push('#' + el.name + " {\n\t" + defaultProperties.join(";\n\t") + "\n}\n");
-
 		}
-
+		// console.log(data);
 		return data.join("\n");
 	}
 
-
-	function generateJs(multipleKeyframes, useBasic){
-
-		var el = null,
-				response = "",
-				offset = 0,
-				timeline = [],
-				element = [];
-
-		// response += "$(document).ready(function(){";
-		response += "\n\tvar timeline = new TimelineLite();";
-		response += "\n\tvar offset = 0;";
-
-		// console.log(multipleKeyframes);
-		for(var a = 0, l1 = multipleKeyframes.length; a < l1; ++a){
-			keyframes = multipleKeyframes[a];
-
-			var totalTime = 0,
-					prevTime = 0;
-			;
-
-			if(keyframes.data.length > 0)
-			{
-				for(var b = 0, l2 = keyframes.data.length; b < l2; ++b)
-				{
-					keyframe = keyframes.data[b];
-
-					var properties = {},
-							name;
-
-					Object.each(keyframe.properties, function(property, name){
-						if(/rotate/.test(name)){
-							name = name.replace(/rotate/, 'rotation');
-						}
-
-						if(useBasic){
-							if(/[xy]/.test(name)){
-								name = name.replace(/x/, 'left');
-								name = name.replace(/y/, 'top');
-							}
-						}
-
-						this[name] = property.value;
-					}, properties);
-
-
-					if(keyframe.easing != ''){
-						properties['ease'] = keyframe.easing;
-					}
-
-					properties = JSON.stringify(properties);
-					properties = properties.replace(new RegExp('"ease":"' + keyframe.easing + '"'), 'ease:' + keyframe.easing + '');
-
-					timeline.push("timeline.to( $('#" + keyframes.el.name + "'), " + (keyframe.time - prevTime) + ", " + properties + ", (offset + " + prevTime + ") );");
-
-					prevTime = keyframe.time;
-				}
-			}
-		}
-
-
-		response += "\n\t" + timeline.join("\n\t");
-		response += "\n\t timeline.pause();";
-		// response += "\n });";
-
-		return response;
-	}
-
-	function generateJsFromTo(multipleKeyframes, useBasic){
+	function generateJs(multipleKeyframes, formatForOldBrowsers){
 
 		var el = null,
 				response = "",
 				offset = 0,
 				timeline = [],
+				labels = [],
 				element = [],
 				keyframeA = null,
 				keyframeB = null;
 
-
-
 		// response += "$(document).ready(function(){";
-		response += "\n\tvar timeline = new TimelineLite();";
-		response += "\n\tvar offset = 0;";
+		// response += "\n\tvar timeline = timeline || new TimelineLite();";
+		// response += "\n\tvar offset = offset || 0;";
 
 		for(var a = 0, l1 = multipleKeyframes.length; a < l1; ++a){
 			keyframes = multipleKeyframes[a];
 
 			var totalTime = 0,
 				prevTime = 0,
-				offsetTime = 0;
+				offsetTime = 0,
+				data = '';
 
 			if(keyframes.data.length > 0)
 			{
@@ -465,25 +411,31 @@ define(function(){
 					if(typeof(keyframeB) == 'undefined'){
 						break;
 					}
+					console.log(keyframeA.properties);
+					if( keyframeA.properties['label'] ){
+						labels.push('timeline.addLabel(\'' + keyframeA.properties['label'].value + '\', '+keyframeA.time+');');
+					}
 					
 					if(b == 0){
 						offsetTime = 0.001;
-						var data = 'timeline.to('
+						data = 'timeline.to('
 								+ "$('#" + keyframes.el.name + "'), "
 								+ offsetTime + ", "
-								+ generateJsFromTo.formatProperties(keyframeA, useBasic) + ', '
-								+ "(offset)"
+								+ generateJs.formatProperties(keyframeA, formatForOldBrowsers) + ', '
+								+ (0)
 								+ ');';
 	
 						timeline.push(data);
 					}
 					
-					var data = 'timeline.to('
+					
+					
+					data = 'timeline.to('
 							+ "$('#" + keyframes.el.name + "'), "
 							+ (keyframeB.time - keyframeA.time) + ", "
-							// + generateJsFromTo.formatProperties(keyframeA, useBasic) + ', '
-							+ generateJsFromTo.formatProperties(keyframeB, useBasic) + ', '
-							+ "(offset + " + (prevTime + offsetTime) + ")"
+							+ generateJs.formatProperties(keyframeB, formatForOldBrowsers) + ', '
+							// + "(offset + " + (prevTime + offsetTime) + ")"
+							+ (prevTime + offsetTime) 
 							+ ');';
 //
 					timeline.push(data);
@@ -494,23 +446,26 @@ define(function(){
 			}
 		}
 
+		response += "\n\t" + labels.join("\n\t");
 		response += "\n\t" + timeline.join("\n\t");
-		response += "\n\t timeline.pause();";
+		
 
 		return response;
 	}
 
-	generateJsFromTo.formatProperties = function(keyframe, useBasic){
+	generateJs.formatProperties = function(keyframe, formatForOldBrowsers){
 		var properties = {};
 		Object.each(keyframe.properties, function(property, name){
 			if(/rotate/.test(name)){
 				name = name.replace(/rotate/, 'rotation');
 			}
 
-			if(useBasic){
+			if(formatForOldBrowsers){
 				if(/[xy]/.test(name)){
-					name = name.replace(/x/, 'left');
-					name = name.replace(/y/, 'top');
+					name = name.replace(/^x$/, 'left');
+					name = name.replace(/^y$/, 'top');
+				} else if(/^z$/.test(name)){
+					return;
 				}
 			}
 
@@ -530,10 +485,22 @@ define(function(){
 	ANIMWriter.prototype.parse = function(){
 
 		var result = {};
-
-		result.css = generateStyleSheet(this.elements);
+		
+		result.css = '';
+		result.css += generateStyleSheet(this.elements, true, true );
+		result.css += generateStyleSheet(this.elements, false, true );
+		
 		result.html = generateElementHtml(this.elements);
-		result.js = generateJsFromTo(this.animations, this.useBasic);
+		
+		var js = "var timeline = new TimelineLite();\n";
+			js += "timeline.pause();\n";
+			js += "if( Browser.ie && Browser.version < 9 ){\n";
+			js += generateJs(this.animations, true ) + "\n"
+			js += "} else {\n";
+			js += generateJs(this.animations, false ) + "\n"
+			js += "}";
+			
+		result.js = js;
 
 		return result;
 	}
