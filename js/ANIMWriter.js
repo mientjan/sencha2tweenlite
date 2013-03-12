@@ -8,79 +8,87 @@ define(function(){
 		if(typeof(value) != 'undefined'){
 			this.enabled = typeof(value.enabled) == 'undefined' ? true : value.enabled;
 		}
+		
+		if( this.enabled ){
+			switch(true){
+				case /scene-endtime/.test(name) && this.enabled:
 
-		switch(true){
-			case /scene-endtime/.test(name) && this.enabled:
+					this.enabled = false;
+					break;
+				case /custom-css/.test(name) && this.enabled:
+					value.value.split(';').forEach(function(css){
+						if(css == ""){
+							return;
+						}
+						css = css.split(':');
 
-				this.enabled = false;
-				break;
-			case /custom-css/.test(name) && this.enabled:
-				value.value.split(';').forEach(function(css){
-					if(css == ""){
-						return;
-					}
-					css = css.split(':');
-					
-					this.properties[css[0]] = new Property(css[0], css[1]);
-				}, parent);
-				this.enabled = false;
-				break;
-			case /object-text/.test(name):
-			case /scene-description/.test(name):
-			case /object-name/.test(name):
-			case /keyframe-time/.test(name):
-			case /keyframe-easing/.test(name):
-				this.enabled = false;
-				break;
-			case /-color/.test(name):
-				this.value = 'rgba(' + [value.r, value.g, value.b, value.a].join(',') + ')';
-				break;
-			case /object-image/.test(name):
-				parent.src = value.src;
-				this.enabled = false;
-				break;
-			case /background-image/.test(name):
-				this.value = 'url(' + value.src + ')';
+						this.properties[css[0]] = new Property(css[0], css[1]);
+					}, parent);
+					this.enabled = false;
+					break;
+				case /object-text/.test(name):
+				case /scene-description/.test(name):
+				case /object-name/.test(name):
+				case /keyframe-time/.test(name):
+				case /keyframe-easing/.test(name):
+					this.enabled = false;
+					break;
+				case /-color/.test(name):
+					this.value = 'rgba(' + [value.r, value.g, value.b, value.a].join(',') + ')';
+					break;
+				case /object-image/.test(name):
+					parent.src = value.src;
+					this.enabled = false;
+					break;
+				case /background-image/.test(name):
+					this.value = 'url(' + value.src + ')';
 
-				break;
-			case /translate3d/.test(name):
-				// parent.properties[name] = {};
-				parent.properties['position'] = new Property('position', 'absolute');
-				if(!basic){
-					parent.properties['x'] = new Property('x', value.x);
-					parent.properties['y'] = new Property('y', value.y);
-					parent.properties['z'] = new Property('z', value.z);
-				} else {
-					parent.properties['left'] = new Property('left', value.x);
-					parent.properties['top'] = new Property('top', value.y);
-				}
-				this.enabled = false;
-				break;
-			case /scale3d/.test(name):
+					break;
+				case /translate3d/.test(name):
 					// parent.properties[name] = {};
-					parent.properties['scaleX'] = new Property('scaleX', value.x);
-					parent.properties['scaleY'] = new Property('scaleY', value.y);
-					parent.properties['scaleZ'] = new Property('scaleZ', value.z);
+					parent.properties['position'] = new Property('position', 'absolute');
+					if(!basic){
+						parent.properties['x'] = new Property('x', value.x);
+						parent.properties['y'] = new Property('y', value.y);
+						parent.properties['z'] = new Property('z', value.z);
+					} else {
+						parent.properties['left'] = new Property('left', value.x);
+						parent.properties['top'] = new Property('top', value.y);
+					}
+					this.enabled = false;
+					break;
+				case /scale3d/.test(name):
+
+
+						if(!basic){
+							parent.properties['scaleX'] = new Property('scaleX', value.x);
+							parent.properties['scaleY'] = new Property('scaleY', value.y);
+							parent.properties['scaleZ'] = new Property('scaleZ', value.z);
+						} else {
+
+							parent.properties['scaleX'] = new Property('scaleX', value.x);
+							parent.properties['scaleY'] = new Property('scaleY', value.y);
+						}
+						this.enabled = false;
+						break;
+
+					case /border-/.test(name):
+							this.enabled = false;
+					this.value = value.width + 'px ' + value.line + ' rgba(' + [value.r, value.g, value.b, value.a].join(',') + ')';
+					break;
+				case /rotate$/.test(name):
+					// parent.properties[name] = {};
+					parent.properties['rotateX'] = new Property('rotateX', value.x);
+					parent.properties['rotateY'] = new Property('rotateY', value.y);
+					parent.properties['rotateZ'] = new Property('rotateZ', value.z);
 
 					this.enabled = false;
 					break;
 
-				case /border-/.test(name):
-						this.enabled = false;
-				this.value = value.width + 'px ' + value.line + ' rgba(' + [value.r, value.g, value.b, value.a].join(',') + ')';
-				break;
-			case /rotate$/.test(name):
-				// parent.properties[name] = {};
-				parent.properties['rotateX'] = new Property('rotateX', value.x);
-				parent.properties['rotateY'] = new Property('rotateY', value.y);
-				parent.properties['rotateZ'] = new Property('rotateZ', value.z);
-
-				this.enabled = false;
-				break;
-
-			default:
-				this.value = typeof(value) == 'object' ? value.value : value;
-				break;
+				default:
+					this.value = typeof(value) == 'object' ? value.value : value;
+					break;
+			}
 		}
 	}
 
@@ -137,7 +145,6 @@ define(function(){
 		this.children = [];
 		this.keyframes = [];
 
-		// console.log(this.type);
 		if(el.properties){
 			Object.each(el.properties, function(value, name){
 
@@ -199,7 +206,7 @@ define(function(){
 
 				}, this);
 			}
-//			// console.log(this.name, this.properties);
+
 		}
 	}
 
@@ -411,7 +418,7 @@ define(function(){
 					if(typeof(keyframeB) == 'undefined'){
 						break;
 					}
-					console.log(keyframeA.properties);
+					
 					if( keyframeA.properties['label'] ){
 						labels.push('timeline.addLabel(\'' + keyframeA.properties['label'].value + '\', '+keyframeA.time+');');
 					}
@@ -461,12 +468,20 @@ define(function(){
 			}
 
 			if(formatForOldBrowsers){
-				if(/[xy]/.test(name)){
-					name = name.replace(/^x$/, 'left');
-					name = name.replace(/^y$/, 'top');
-				} else if(/^z$/.test(name)){
-					return;
+				
+				switch(true){
+					case /[xy]/.test(name):
+						name = name.replace(/^x$/, 'left');
+						name = name.replace(/^y$/, 'top');
+					break;
+					
+					case /^z$/.test(name):
+					case /^scaleZ/.test(name):
+						return;
+						break;
+					
 				}
+				
 			}
 
 			this[name] = property.value;
