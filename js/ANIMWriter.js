@@ -64,10 +64,6 @@ define(function(){
 							parent.properties['scaleX'] = new Property('scaleX', value.x);
 							parent.properties['scaleY'] = new Property('scaleY', value.y);
 							parent.properties['scaleZ'] = new Property('scaleZ', value.z);
-						} else {
-
-							parent.properties['scaleX'] = new Property('scaleX', value.x);
-							parent.properties['scaleY'] = new Property('scaleY', value.y);
 						}
 						this.enabled = false;
 						break;
@@ -421,6 +417,7 @@ define(function(){
 					
 					if( keyframeA.properties['label'] ){
 						labels.push('timeline.addLabel(\'' + keyframeA.properties['label'].value + '\', '+keyframeA.time+');');
+						delete(keyframeA.properties['label']);
 					}
 					
 					if(b == 0){
@@ -435,14 +432,14 @@ define(function(){
 						timeline.push(data);
 					}
 					
-					
+					console.log( prevTime, offsetTime );
 					
 					data = 'timeline.to('
 							+ "$('#" + keyframes.el.name + "'), "
 							+ (keyframeB.time - keyframeA.time) + ", "
 							+ generateJs.formatProperties(keyframeB, formatForOldBrowsers) + ', '
 							// + "(offset + " + (prevTime + offsetTime) + ")"
-							+ (prevTime + offsetTime) 
+							+ ( keyframeA.time + offsetTime ) 
 							+ ');';
 //
 					timeline.push(data);
@@ -476,6 +473,8 @@ define(function(){
 					break;
 					
 					case /^z$/.test(name):
+					case /^scaleX/.test(name):
+					case /^scaleY/.test(name):
 					case /^scaleZ/.test(name):
 						return;
 						break;
